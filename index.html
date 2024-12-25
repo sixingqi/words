@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editable Grid with Persistent Sound</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(6, 100px);
+            grid-template-rows: repeat(6, 100px);
+            gap: 5px;
+            margin-top: 20px;
+        }
+
+        .grid-item {
+            border: 1px solid #ccc;
+            background-color: #fff;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            text-align: center;
+            padding: 5px;
+            position: relative;
+        }
+
+        .grid-item input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            text-align: center;
+            font-size: 1em;
+        }
+
+        .grid-item input:focus {
+            outline: none;
+        }
+
+        .play-button {
+            margin-top: 5px;
+            font-size: 0.8em;
+            padding: 3px 5px;
+        }
+
+        .button-container {
+            margin-top: 20px;
+        }
+
+        .button-container button {
+            margin: 0 10px;
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            border: none;
+            background-color: #007BFF;
+            color: white;
+            border-radius: 5px;
+        }
+
+        .button-container button:hover {
+            background-color: #0056b3;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-container" id="grid-container">
+        <!-- Grid items will be dynamically generated -->
+    </div>
+
+    <div class="button-container">
+        <button id="save-button">Save</button>
+        <button id="edit-button">Edit</button>
+    </div>
+
+    <script>
+        const gridContainer = document.getElementById('grid-container');
+        const saveButton = document.getElementById('save-button');
+        const editButton = document.getElementById('edit-button');
+        const GRID_SIZE = 36;
+
+        // Load grid state from localStorage
+        const loadGridState = () => {
+            return JSON.parse(localStorage.getItem('gridState')) || Array(GRID_SIZE).fill({ word: '', sound: '' });
+        };
+
+        // Save grid state to localStorage
+        const saveGridState = (gridState) => {
+            localStorage.setItem('gridState', JSON.stringify(gridState));
+        };
+
+        const gridState = loadGridState();
+
+        // Utility function to convert file to base64
+        const fileToBase64 = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = (error) => reject(error);
+                reader.readAsDataURL(file);
+            });
+        };
+
+        // Create a 6x6 grid dynamically
+        gridState.forEach((cell, index) => {
+            const gridItem = document.createElement('div');
+            gridItem.classList.add('grid-item');
+
+            // Display saved word
+            if (cell.word) {
+                gridItem.textContent = cell.word;
+            }
+
+            // Add play button if sound exists
+            if (cell.sound) {
+                const playButton = document.createElement('button');
+                playButton.textContent = 'Play';
+                playButton.classList.add('play-button');
+                playButton.addEventListener('click', () => {
+                    const audio = new Audio(cell.sound);
+                    audio.play();
+                });
+                gridItem.appendChild(playButton);
+            }
+
+            // Left-click to edit text
+            gridItem.addEventListener('click', (e) => {
+                if (e.button === 0) { // Left button
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = cell.word;
+                    gridItem.textContent = '';
+                    gridItem.appendChild(input);
+                    input.focus();
+                    input.addEventListener('blur', () => {
+                        cell.word = input.value;
+                        gridItem.textContent = input.value;
+
+                        // Re-add the play button if sound exists
+                        if (cell.sound) {
+                            const playButton = document.createElement('button');
+                            playButton.textContent = 'Play';
+                            playButton.classList.add('play-button');
+                            playButton.addEventListener('click', () => {
+                                const audio = new Audio(cell.sound);
+                                audio.play();
+                            });
+                            gridItem.appendChild(playButton);
+                        }
+
+                        saveGridState(gridState);
+                    });
+                }
+            });
+
+            // Right-click to add sound
+            gridItem.addEventListener('contextmenu', async (e) => {
+                e.preventDefault();
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'audio/*';
+
+                fileInput.addEventListener('change', async (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const base64 = await fileToBase64(file);
+                        cell.sound = base64;
+                        saveGridState(gridState);
+
+                        // Add or update the play button
+                        const playButton = document.createElement('button');
+                        playButton.textContent = 'Play';
+                        playButton.classList.add('play-button');
+                        playButton.addEventListener('click', () => {
+                            const audio = new Audio(base64);
+                            audio.play();
+                        });
+
+                        // Clear any existing play button and re-add
+                        gridItem.querySelectorAll('button').forEach(button => button.remove());
+                        gridItem.appendChild(playButton);
+                    }
+                });
+
+                fileInput.click();
+            });
+
+            gridContainer.appendChild(gridItem);
+        });
+
+        saveButton.addEventListener('click', () => {
+            saveGridState(gridState);
+            alert('Grid state saved successfully!');
+        });
+
+        editButton.addEventListener('click', () => {
+            location.reload();
+        });
+
+        saveGridState(gridState); // Ensure initial state is saved
+    </script>
+</body>
+</html>
